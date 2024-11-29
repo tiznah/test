@@ -10,7 +10,7 @@ contract DeployTimeLockScript is Script {
         // MOG address 
         address tokenAddress = 0x2Da56AcB9Ea78330f947bD57C54119Debda7AF71; 
         // A year in seconds
-        uint256 lockTimeInSeconds = 365*24*60*60;
+        uint256 lockTimeInSeconds = 365*1 days;
 
         TimeLock timelock = new TimeLock(lockTimeInSeconds, tokenAddress);
 
