@@ -51,4 +51,4 @@ this project include:
 2.- NFT support
 3.- FlipLock mode where you can lock ERC20 tokens until their marketcap flips a chosen token's marketcap using decentralized oracles.
 
-All of this without mentioning general quality of life upgrades such as a usable front end and better security for tokens. 
+All of this without mentioning general quality of life upgrades such as a usable front end and better security for tokens. # TimeLocked
