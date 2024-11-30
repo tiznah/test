@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"name": "TimeLockFinal",
+			"path": "../../TimeLockFinal"
+		},
+		{
+			"name": "test",
+			"path": "../test"
+		},
+		{
+			"name": "src",
+			"path": "."
+		},
+		{
+			"name": "script",
+			"path": "../script"
+		}
+	],
+	"settings": {}
+}
