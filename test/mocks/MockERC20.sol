@@ -33,9 +33,10 @@ contract MockERC20 is Test {
         balanceOf[to] += amount;
         return true;
     }
+
     function transfer(address to, uint256 amount) public returns (bool) {
         require(amount <= balanceOf[msg.sender], "Insufficient balance");
-        
+
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
         return true;
