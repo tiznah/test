@@ -2,7 +2,7 @@
 
 TimeLock is an implementation of a vault used to lock a single ERC-20 token for a given amount of time using exclusively onchain data for the locking mechanism.
 
-Functionality has been kept simple as to prevent vulnerabilities as much as possible, this code has not yet been audited by professional auditors.
+Functionality has been kept simple as to prevent vulnerabilities as much as possible, this code has not yet been audited by professionals.
 
 The two functions available for this contract are: 
 `makeDeposit(uint256 _lockTime, uint256 _amount)` is used to deposit ERC20 tokens into the contract, each user can only create one deposit at a time and they choose how long it will last. The user cannot create another deposit while they have an active one and to create a new one they need to withdraw the tokens from the first deposit.
