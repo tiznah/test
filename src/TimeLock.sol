@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+using SafeERC20 for IERC20;
 /// @title Timelock.
 /// @author Tiznah.
 /// @notice Lock ERC20 tokens for a certain amount of blocks and then claim.
-/// @dev Version 2 using only onchain data, single token, multiple users each with their own lockup time.
+/// @dev Version 2 using only onchain data, single token, multiple users can choose their own lock time.
 
 contract TimeLock {
     // Custom errors.
@@ -18,16 +20,14 @@ contract TimeLock {
     error NoActiveLocks();
     error MustHaveAnActiveLock();
 
-    // Structs
-    // Struct to keep track of the user address, amount deposited and block.timestamp in which their tokens will unlock.
+    // Structs.
     struct Deposit {
-        address user;
         uint256 amount;
         uint256 endingTime;
     }
 
-    // Arrays.
-    Deposit[] public deposits;
+    // Mappings.
+    mapping(address => Deposit[]) public userDeposits;
 
     // Events.
     event LockCreated(address indexed _tokenAddress);
@@ -37,53 +37,55 @@ contract TimeLock {
     // immutable variables since they don't change after being defined.
     IERC20 public immutable token;
 
-    // @param _tokenAddress is the address of the ERC20 token the contract will lock.
+    // @param _tokenAddress is the address of the ERC20 token the contract will lock, using only one for simplicity.
     constructor(address _tokenAddress) {
         token = IERC20(_tokenAddress);
         emit LockCreated(_tokenAddress);
     }
 
-    // makeDeposit function lets a user deposit their tokens for a chosen amount of time.
-    // @param _lockTime is the amount of time in seconds that specific deposit will last.
-    // @param _amount is the amount of tokens will be locked up in the deposit.
+    // Function to deposit token into the contract.
+    // @param _lockTime is the time in seconds the user will lock the tokens for.
+    // @param _amount is the amount of tokens that will be locked.
     function makeDeposit(uint256 _lockTime, uint256 _amount) external {
-        require(_amount > 0, MustBeGreaterThanZero());
-        uint256 _endingTime = block.timestamp + _lockTime; // Calcualte the time when the tokens should unlock
+        if (_amount == 0) revert MustBeGreaterThanZero();
+        uint256 _endingTime = block.timestamp + _lockTime; // calculate the time when the tokens should unlock by adding the current timestamp
 
-        uint256 index = getDepositIndex(); // Get the index in the deposits array from the msg.sender
-        if (index == type(uint256).max) {
-            // if there are no active timelocks push a new deposit struct into the array
-            require(token.transferFrom(msg.sender, address(this), _amount), TransferFailed());
-            deposits.push(Deposit(msg.sender, _amount, _endingTime));
-            emit DepositCreated(msg.sender, _amount, _endingTime);
+        // Access user's deposit array
+        Deposit[] storage deposits = userDeposits[msg.sender];
+        bool hasActiveDeposit = false;
+
+        // Checking for active deposits by the user.
+        for (uint256 i = 0; i < deposits.length; i++) {
+            if (deposits[i].endingTime > block.timestamp) {
+                hasActiveDeposit = true;
+                break;
+            }
+        }
+        if (hasActiveDeposit) {
+            revert CanOnlyHaveOneActiveLock();
         } else {
-            // if there is an active or past timelock ensure the user has withdrawn before making another deposit
-            require(deposits[index].amount == 0, CanOnlyHaveOneActiveLock());
-            deposits[index].amount = _amount;
-            deposits[index].endingTime = _endingTime;
+            deposits.push(Deposit(_amount, _endingTime)); // Here we don't store user since it's already part of the mapping key
             emit DepositCreated(msg.sender, _amount, _endingTime);
+            token.safeTransferFrom(msg.sender, address(this), _amount);
         }
     }
 
     // Withdraw function lets users withdraw their deposit if the lock time has passed.
     function withdraw() external {
-        uint256 index = getDepositIndex(); // Get the index in the deposits array from the msg.sender
-        require(index != type(uint256).max, NoActiveLocks());
-        Deposit storage _deposit = deposits[index];
-        require(_deposit.amount != 0, MustHaveAnActiveLock()); // if the deposited amount is zero there are no tokens to withdraw
-        require(block.timestamp >= _deposit.endingTime, TokensNotUnlocked());
-        require(token.transfer(msg.sender, _deposit.amount), TransferFailed());
-        deposits[index].amount = 0; // change amount for that deposit to zero to indicate it has been withdrawn
-        emit WithdrawCreated(_deposit.amount);
-    }
-
-    // Helper functions
-    function getDepositIndex() public view returns (uint256) {
+        // Access user's deposits and check that there have been deposits in the past.
+        Deposit[] storage deposits = userDeposits[msg.sender];
+        if (deposits.length == 0) revert NoActiveLocks(); // Must have an active lock
+        // Find the first active deposit for the user
         for (uint256 i = 0; i < deposits.length; i++) {
-            if (deposits[i].user == msg.sender) {
-                return i;
+            if (deposits[i].amount > 0) {
+                uint256 _amount = deposits[i].amount;
+                if (block.timestamp <= deposits[i].endingTime) revert TokensNotUnlocked();
+                deposits[i].amount = 0; // Mark this deposit as withdrawn before the state change in order to follow CEI
+                token.safeTransfer(msg.sender, _amount);
+                emit WithdrawCreated(_amount);
+                return;
             }
         }
-        return type(uint256).max; // if the user was not found return the max uint256
+        revert MustHaveAnActiveLock(); // If no active deposit found
     }
 }
